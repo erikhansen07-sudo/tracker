@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Project Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: white;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #savedIndicator {
+      font-size: 0.75rem;
+      color: #27ae60;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    #savedIndicator.show { opacity: 1; }
+
+    #syncNote {
+      font-size: 0.75rem;
+      opacity: 0.45;
+      font-style: italic;
+    }
+
+    .board {
+      display: flex;
+      gap: 20px;
+      padding: 28px 32px;
+      overflow-x: auto;
+      min-height: calc(100vh - 64px);
+      align-items: flex-start;
+    }
+
+    .column {
+      background: #e4e8ef;
+      border-radius: 12px;
+      width: 300px;
+      min-width: 300px;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 120px);
+    }
+
+    .column-header {
+      padding: 14px 16px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: #e4e8ef;
+      border-radius: 12px 12px 0 0;
+    }
+
+    .column-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #444;
+    }
+
+    .column-count {
+      background: rgba(0,0,0,0.1);
+      color: #555;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 12px;
+      padding: 2px 8px;
+    }
+
+    .column[data-col="todo"]       .column-header { border-top: 4px solid #6c63ff; border-radius: 12px 12px 0 0; }
+    .column[data-col="inprogress"] .column-header { border-top: 4px solid #f6a623; border-radius: 12px 12px 0 0; }
+    .column[data-col="done"]       .column-header { border-top: 4px solid #27ae60; border-radius: 12px 12px 0 0; }
+
+    .cards {
+      padding: 8px 10px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      cursor: grab;
+      position: relative;
+      transition: box-shadow 0.15s, transform 0.15s;
+      border-left: 4px solid transparent;
+    }
+
+    .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.14); transform: translateY(-1px); }
+    .card.dragging { opacity: 0.5; cursor: grabbing; }
+    .card.drag-over { box-shadow: 0 0 0 2px #6c63ff; }
+
+    .card[data-priority="high"]   { border-left-color: #e74c3c; }
+    .card[data-priority="medium"] { border-left-color: #f6a623; }
+    .card[data-priority="low"]    { border-left-color: #27ae60; }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 0.92rem;
+      color: #222;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .card-desc {
+      font-size: 0.78rem;
+      color: #777;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 6px;
+    }
+
+    .card-priority {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .card-priority.high   { background: #fde8e8; color: #c0392b; }
+    .card-priority.medium { background: #fef3e2; color: #d68910; }
+    .card-priority.low    { background: #e8f8f0; color: #1e8449; }
+
+    .card-actions {
+      display: flex;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .card:hover .card-actions { opacity: 1; }
+
+    .card-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 3px 5px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: #aaa;
+      transition: background 0.1s, color 0.1s;
+    }
+    .card-btn:hover { background: #f0f0f0; color: #555; }
+    .card-btn.delete:hover { background: #fde8e8; color: #c0392b; }
+
+    .add-card-btn {
+      margin: 4px 10px 10px;
+      padding: 9px;
+      background: transparent;
+      border: 2px dashed #c5cad6;
+      border-radius: 8px;
+      cursor: pointer;
+      color: #888;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .add-card-btn:hover { border-color: #6c63ff; color: #6c63ff; background: #f5f3ff; }
+
+    .column.drag-target { background: #dde1ea; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: 14px;
+      padding: 28px 30px;
+      width: 420px;
+      max-width: 95vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+
+    .modal h2 { font-size: 1.1rem; font-weight: 700; color: #1a1a2e; margin-bottom: 18px; }
+
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: #555; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: #222;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #6c63ff; }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    .btn {
+      padding: 9px 20px;
+      border-radius: 7px;
+      border: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary   { background: #6c63ff; color: white; }
+    .btn-primary:hover { background: #5a52d5; }
+    .btn-secondary { background: #f0f0f0; color: #555; }
+    .btn-secondary:hover { background: #e0e0e0; }
+
+    /* Error banner */
+    #errorBanner {
+      display: none;
+      background: #fde8e8;
+      color: #c0392b;
+      padding: 12px 32px;
+      font-size: 0.85rem;
+      border-bottom: 1px solid #f5c6c6;
+    }
+    #errorBanner.show { display: block; }
+
+    /* Reload button */
+    #reloadBtn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      opacity: 0.5;
+      transition: opacity 0.15s;
+      color: white;
+    }
+    #reloadBtn:hover { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Project Tracker</h1>
+  <div class="header-right">
+    <span id="savedIndicator">✓ Saved</span>
+    <span id="syncNote">data: tasks.json</span>
+    <button id="reloadBtn" title="Reload from tasks.json" onclick="load()">🔄</button>
+  </div>
+</header>
+
+<div id="errorBanner"></div>
+
+<div class="board" id="board">
+  <div class="column" data-col="todo">
+    <div class="column-header">
+      <span class="column-title">To Do</span>
+      <span class="column-count" id="count-todo">0</span>
+    </div>
+    <div class="cards" id="cards-todo"
+         ondragover="onDragOver(event)"
+         ondrop="onDrop(event, 'todo')"
+         ondragleave="onDragLeave(event)"></div>
+    <button class="add-card-btn" onclick="openModal('todo')">+ Add task</button>
+  </div>
+
+  <div class="column" data-col="inprogress">
+    <div class="column-header">
+      <span class="column-title">In Progress</span>
+      <span class="column-count" id="count-inprogress">0</span>
+    </div>
+    <div class="cards" id="cards-inprogress"
+         ondragover="onDragOver(event)"
+         ondrop="onDrop(event, 'inprogress')"
+         ondragleave="onDragLeave(event)"></div>
+    <button class="add-card-btn" onclick="openModal('inprogress')">+ Add task</button>
+  </div>
+
+  <div class="column" data-col="done">
+    <div class="column-header">
+      <span class="column-title">Done</span>
+      <span class="column-count" id="count-done">0</span>
+    </div>
+    <div class="cards" id="cards-done"
+         ondragover="onDragOver(event)"
+         ondrop="onDrop(event, 'done')"
+         ondragleave="onDragLeave(event)"></div>
+    <button class="add-card-btn" onclick="openModal('done')">+ Add task</button>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnOverlay(event)">
+  <div class="modal">
+    <h2 id="modalTitle">Add Task</h2>
+    <div class="form-group">
+      <label>Task Title *</label>
+      <input type="text" id="cardTitle" placeholder="e.g. Review lease terms" />
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="cardDesc" placeholder="Optional details..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Priority</label>
+      <select id="cardPriority">
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCard()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const DATA_URL  = './tasks.json';
+  const SAVE_URL  = null; // No write-back endpoint; changes are saved via CLI or manual edit
+  const COLS      = ['todo', 'inprogress', 'done'];
+
+  let data       = { todo: [], inprogress: [], done: [] };
+  let editingId  = null;
+  let modalCol   = null;
+  let dragId     = null;
+
+  // ── uid ──────────────────────────────────────────────────────────────────
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  // ── error banner ─────────────────────────────────────────────────────────
+
+  function showError(msg) {
+    const b = document.getElementById('errorBanner');
+    b.textContent = msg;
+    b.classList.add('show');
+  }
+  function clearError() {
+    document.getElementById('errorBanner').classList.remove('show');
+  }
+
+  // ── load / save ───────────────────────────────────────────────────────────
+
+  async function load() {
+    clearError();
+    try {
+      // Try fetching tasks.json (works when served via local server or GitHub Pages)
+      const res = await fetch(DATA_URL + '?_=' + Date.now());
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const fetched = await res.json();
+      data = { todo: [], inprogress: [], done: [], ...fetched };
+    } catch (e) {
+      // Fallback: try localStorage (for file:// access)
+      const stored = localStorage.getItem('project-tracker-v2');
+      if (stored) {
+        try { data = JSON.parse(stored); }
+        catch { data = { todo: [], inprogress: [], done: [] }; }
+        showError('⚠ Could not load tasks.json (serve this folder to enable full sync). Showing locally cached data.');
+      } else {
+        data = { todo: [], inprogress: [], done: [] };
+        showError('⚠ Could not load tasks.json. Serve this folder with a local server (e.g. npx serve .) to enable sync with the CLI.');
+      }
+    }
+    render();
+  }
+
+  function save() {
+    // Always persist a local copy so the UI stays usable even offline
+    localStorage.setItem('project-tracker-v2', JSON.stringify(data));
+
+    // Show saved indicator
+    const ind = document.getElementById('savedIndicator');
+    ind.classList.add('show');
+    setTimeout(() => ind.classList.remove('show'), 1800);
+
+    // Note: tasks.json is updated by the CLI (tracker-cli.js), not by the browser.
+    // The browser is read-only with respect to the file system.
+    // After making changes here, export them manually if needed:
+    // node tracker-cli.js add / move / edit / delete
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
+
+  function render() {
+    COLS.forEach(col => {
+      const container = document.getElementById('cards-' + col);
+      container.innerHTML = '';
+      (data[col] || []).forEach(card => {
+        container.appendChild(makeCardEl(card, col));
+      });
+      document.getElementById('count-' + col).textContent = (data[col] || []).length;
+    });
+  }
+
+  function makeCardEl(card, col) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.setAttribute('data-id', card.id);
+    el.setAttribute('data-col', col);
+    el.setAttribute('data-priority', card.priority || 'medium');
+    el.draggable = true;
+
+    el.innerHTML = `
+      <div class="card-title">${escHtml(card.title)}</div>
+      ${card.desc ? `<div class="card-desc">${escHtml(card.desc)}</div>` : ''}
+      <div class="card-meta">
+        <span class="card-priority ${card.priority || 'medium'}">${cap(card.priority || 'medium')}</span>
+        <div class="card-actions">
+          <button class="card-btn" onclick="editCard('${card.id}', '${col}')" title="Edit">✏️</button>
+          <button class="card-btn delete" onclick="deleteCard('${card.id}', '${col}')" title="Delete">🗑️</button>
+        </div>
+      </div>
+    `;
+
+    el.addEventListener('dragstart', e => {
+      dragId = card.id;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      dragId = null;
+      document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-target'));
+    });
+
+    return el;
+  }
+
+  // ── drag & drop ───────────────────────────────────────────────────────────
+
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const col = e.currentTarget.closest('.column');
+    if (col) col.classList.add('drag-target');
+  }
+
+  function onDragLeave(e) {
+    const col = e.currentTarget.closest('.column');
+    if (col && !col.contains(e.relatedTarget)) col.classList.remove('drag-target');
+  }
+
+  function onDrop(e, targetCol) {
+    e.preventDefault();
+    document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-target'));
+    if (!dragId) return;
+
+    let card = null;
+    COLS.forEach(col => {
+      const idx = data[col].findIndex(c => c.id === dragId);
+      if (idx !== -1) { card = data[col].splice(idx, 1)[0]; }
+    });
+
+    if (card) {
+      data[targetCol].push(card);
+      save();
+      render();
+    }
+  }
+
+  // ── modal ─────────────────────────────────────────────────────────────────
+
+  function openModal(col) {
+    modalCol  = col;
+    editingId = null;
+    document.getElementById('modalTitle').textContent    = 'Add Task';
+    document.getElementById('cardTitle').value           = '';
+    document.getElementById('cardDesc').value            = '';
+    document.getElementById('cardPriority').value        = 'medium';
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('cardTitle').focus(), 50);
+  }
+
+  function editCard(id, col) {
+    const card = (data[col] || []).find(c => c.id === id);
+    if (!card) return;
+    editingId = id;
+    modalCol  = col;
+    document.getElementById('modalTitle').textContent    = 'Edit Task';
+    document.getElementById('cardTitle').value           = card.title;
+    document.getElementById('cardDesc').value            = card.desc || '';
+    document.getElementById('cardPriority').value        = card.priority || 'medium';
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('cardTitle').focus(), 50);
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+    editingId = null;
+    modalCol  = null;
+  }
+
+  function closeModalOnOverlay(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  }
+
+  function saveCard() {
+    const title = document.getElementById('cardTitle').value.trim();
+    if (!title) { document.getElementById('cardTitle').focus(); return; }
+    const desc     = document.getElementById('cardDesc').value.trim();
+    const priority = document.getElementById('cardPriority').value;
+
+    if (editingId) {
+      const card = (data[modalCol] || []).find(c => c.id === editingId);
+      if (card) { card.title = title; card.desc = desc; card.priority = priority; card.updatedAt = new Date().toISOString(); }
+    } else {
+      data[modalCol].push({ id: uid(), title, desc, priority, createdAt: new Date().toISOString() });
+    }
+
+    save();
+    render();
+    closeModal();
+  }
+
+  function deleteCard(id, col) {
+    if (!confirm('Delete this task?')) return;
+    data[col] = (data[col] || []).filter(c => c.id !== id);
+    save();
+    render();
+  }
+
+  // ── utils ─────────────────────────────────────────────────────────────────
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // Enter to save in modal
+  document.getElementById('cardTitle').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveCard();
+  });
+
+  // Reload from tasks.json every 30s (useful when Franky pushes changes)
+  setInterval(load, 30000);
+
+  load();
+</script>
+</body>
+</html>
