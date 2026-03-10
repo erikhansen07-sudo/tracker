@@ -464,6 +464,7 @@
 
     el.addEventListener('dragstart', e => {
       dragId = card.id;
+      e.dataTransfer.setData('text/plain', card.id);
       el.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
     });
@@ -493,7 +494,9 @@
   function onDrop(e, targetCol) {
     e.preventDefault();
     document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-target'));
-    if (!dragId) return;
+    const id = e.dataTransfer.getData('text/plain') || dragId;
+    if (!id) return;
+    dragId = id;
 
     let card = null;
     COLS.forEach(col => {
