@@ -496,11 +496,10 @@
     document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-target'));
     const id = e.dataTransfer.getData('text/plain') || dragId;
     if (!id) return;
-    dragId = id;
 
     let card = null;
     COLS.forEach(col => {
-      const idx = data[col].findIndex(c => c.id === dragId);
+      const idx = data[col].findIndex(c => c.id === id);
       if (idx !== -1) { card = data[col].splice(idx, 1)[0]; }
     });
 
@@ -584,8 +583,13 @@
     if (e.key === 'Enter') saveCard();
   });
 
-  // Reload from tasks.json every 30s (useful when Franky pushes changes)
-  setInterval(load, 30000);
+  // Reload from tasks.json every 30s only if there's been no activity in the last 5s
+  let lastActivity = 0;
+  document.addEventListener('dragstart', () => lastActivity = Date.now());
+  document.addEventListener('click', () => lastActivity = Date.now());
+  setInterval(() => {
+    if (Date.now() - lastActivity > 5000) load();
+  }, 30000);
 
   load();
 </script>
