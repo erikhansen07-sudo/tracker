@@ -410,19 +410,23 @@
     render();
   }
 
-  function save() {
-    // Always persist a local copy so the UI stays usable even offline
-    localStorage.setItem('project-tracker-v2', JSON.stringify(data));
+  async function save() {
+    try {
+      // Save directly to tasks.json via local server
+      const res = await fetch('/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('Server error');
+    } catch(e) {
+      // Fallback to localStorage if server isn't running
+      localStorage.setItem('project-tracker-v2', JSON.stringify(data));
+    }
 
-    // Show saved indicator
     const ind = document.getElementById('savedIndicator');
     ind.classList.add('show');
     setTimeout(() => ind.classList.remove('show'), 1800);
-
-    // Note: tasks.json is updated by the CLI (tracker-cli.js), not by the browser.
-    // The browser is read-only with respect to the file system.
-    // After making changes here, export them manually if needed:
-    // node tracker-cli.js add / move / edit / delete
   }
 
   // ── render ────────────────────────────────────────────────────────────────
